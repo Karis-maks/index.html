@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyStudio — Python IDE</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --sidebar: #10151c;
+    --border: #21262d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --accent4: #d2a8ff;
+    --text: #e6edf3;
+    --text-muted: #7d8590;
+    --text-dim: #4d5566;
+    --header: #1c2128;
+    --selection: #264f78;
+    --error: #f85149;
+    --warning: #d29922;
+    --success: #3fb950;
+    --run-btn: #238636;
+    --run-btn-hover: #2ea043;
+    --gutter: #30363d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .topbar {
+    height: 48px;
+    background: var(--header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .logo-icon {
+    width: 26px; height: 26px;
+    background: linear-gradient(135deg, #58a6ff, #3fb950);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+
+  .topbar-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+
+  .file-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .file-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent3); }
+
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .btn-run {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 16px;
+    background: var(--run-btn);
+    border: none; border-radius: 6px;
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600; font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .btn-run:hover { background: var(--run-btn-hover); }
+  .btn-run:active { transform: scale(0.97); }
+  .btn-run.running { background: var(--warning); }
+
+  .btn-sec {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-muted);
+    font-family: 'Syne', sans-serif; font-size: 12px;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-sec:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  .sidebar {
+    width: 48px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    align-items: center; padding: 12px 0; gap: 8px; flex-shrink: 0;
+  }
+
+  .sb-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-muted); font-size: 16px;
+    transition: all .15s; position: relative;
+  }
+  .sb-icon:hover, .sb-icon.active { background: var(--panel); color: var(--accent); }
+
+  .sb-icon::after {
+    content: attr(data-tip);
+    position: absolute; left: calc(100% + 8px); top: 50%;
+    transform: translateY(-50%);
+    background: var(--header); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+    white-space: nowrap; color: var(--text);
+    pointer-events: none; opacity: 0; transition: opacity .15s;
+    z-index: 999;
+  }
+  .sb-icon:hover::after { opacity: 1; }
+
+  .editor-area { flex: 1; display: flex; overflow: hidden; }
+
+  .code-pane {
+    flex: 1; display: flex; flex-direction: column;
+    min-width: 0; border-right: 1px solid var(--border);
+  }
+
+  .pane-header {
+    height: 36px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 14px; gap: 8px;
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .8px; flex-shrink: 0;
+  }
+
+  .ph-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .7; }
+
+  .editor-wrapper { flex: 1; display: flex; overflow: hidden; }
+
+  .line-numbers {
+    width: 52px; background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 14px 8px 14px 0;
+    text-align: right; font-size: 13px; line-height: 1.7;
+    color: var(--text-dim); user-select: none; overflow: hidden;
+    flex-shrink: 0; pointer-events: none;
+  }
+  .line-numbers span { display: block; transition: color .1s; }
+  .line-numbers span.active { color: var(--accent); }
+
+  #editor {
+    flex: 1; background: var(--bg); border: none; outline: none;
+    resize: none; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.7;
+    padding: 14px 16px; tab-size: 4; white-space: pre; overflow: auto;
+    caret-color: var(--accent);
+  }
+  #editor::selection { background: var(--selection); }
+
+  .resizer {
+    width: 4px; background: var(--border); cursor: col-resize;
+    transition: background .15s; flex-shrink: 0;
+  }
+  .resizer:hover, .resizer.dragging { background: var(--accent); }
+
+  .output-pane {
+    width: 420px; min-width: 240px;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+
+  .output-tabs {
+    height: 36px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-end; padding: 0 12px; gap: 2px; flex-shrink: 0;
+  }
+
+  .otab {
+    padding: 5px 14px; font-size: 11px; cursor: pointer;
+    color: var(--text-muted); border-radius: 4px 4px 0 0;
+    border: 1px solid transparent; border-bottom: none; transition: all .15s;
+  }
+  .otab.active { background: var(--bg); color: var(--text); border-color: var(--border); border-bottom-color: var(--bg); }
+  .otab:hover:not(.active) { color: var(--text); }
+
+  #output {
+    flex: 1; background: var(--bg); padding: 14px 16px;
+    overflow-y: auto; font-size: 13px; line-height: 1.75;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  .out-line { display: flex; align-items: flex-start; gap: 8px; }
+  .out-prefix { color: var(--text-dim); font-size: 11px; min-width: 28px; padding-top: 2px; user-select: none; }
+  .out-text { flex: 1; }
+  .out-text.stdout  { color: var(--text); }
+  .out-text.stderr  { color: var(--error); }
+  .out-text.info    { color: var(--accent); }
+  .out-text.success { color: var(--success); }
+  .out-text.warning { color: var(--warning); }
+  .out-text.system  { color: var(--text-dim); font-style: italic; }
+
+  .statusbar {
+    height: 24px; background: var(--accent);
+    display: flex; align-items: center; padding: 0 14px; gap: 20px;
+    font-size: 11px; color: rgba(0,0,0,.75); flex-shrink: 0;
+  }
+  .sb-right { margin-left: auto; display: flex; gap: 16px; }
+
+  /* Libraries panel */
+  .libs-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 320px;
+    background: var(--panel); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform .25s cubic-bezier(.4,0,.2,1);
+    z-index: 100; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .libs-panel.open { transform: translateX(0); }
+
+  .libs-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .libs-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; }
+
+  .libs-close {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+    transition: all .15s;
+  }
+  .libs-close:hover { background: var(--error); color: #fff; border-color: var(--error); }
+
+  .libs-search { padding: 12px; border-bottom: 1px solid var(--border); }
+  .libs-search input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 12px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none;
+    transition: border-color .15s;
+  }
+  .libs-search input:focus { border-color: var(--accent); }
+
+  .libs-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .lib-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    transition: background .1s; gap: 8px;
+  }
+  .lib-item:hover { background: var(--bg); }
+  .lib-info { flex: 1; min-width: 0; }
+  .lib-name { font-size: 12px; color: var(--accent4); font-weight: 500; }
+  .lib-desc { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-btn {
+    padding: 3px 8px; font-size: 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text-muted); cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; transition: all .15s; white-space: nowrap;
+  }
+  .lib-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--gutter); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+
+  @keyframes fadeSlide { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  .out-line { animation: fadeSlide .12s ease both; }
+
+  .notif {
+    position: fixed; bottom: 36px; left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 16px; font-size: 12px; color: var(--text);
+    opacity: 0; transition: all .3s; z-index: 200; pointer-events: none;
+  }
+  .notif.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🐍</div>
+    PyStudio
+  </div>
+  <div class="topbar-center">
+    <div class="file-tab"><div class="file-dot"></div>main.py</div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-sec" onclick="clearOutput()">🗑 Effacer</button>
+    <button class="btn-run" id="runBtn" onclick="runCode()">
+      <span id="runIcon">▶</span>
+      <span id="runLabel">Exécuter</span>
+    </button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sb-icon active" data-tip="Éditeur">📄</div>
+    <div class="sb-icon" data-tip="Bibliothèques" onclick="toggleLibs()">📦</div>
+    <div class="sb-icon" data-tip="Exemples" onclick="loadExample()">💡</div>
+    <div class="sb-icon" data-tip="Aide" onclick="showHelp()">❓</div>
+  </div>
+
+  <div class="editor-area">
+    <div class="code-pane" id="codePane">
+      <div class="pane-header"><div class="ph-dot"></div>Éditeur Python</div>
+      <div class="editor-wrapper">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea id="editor" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+      </div>
+    </div>
+
+    <div class="resizer" id="resizer"></div>
+
+    <div class="output-pane" id="outputPane">
+      <div class="output-tabs">
+        <div class="otab active" onclick="switchTab(this, 'output')">Sortie</div>
+        <div class="otab" onclick="showVars()">Variables</div>
+      </div>
+      <div id="output"></div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span>🐍 Python 3.11 (Pyodide)</span>
+  <span id="sbCursor">Ln 1, Col 1</span>
+  <div class="sb-right">
+    <span id="sbStatus">⏳ Chargement...</span>
+    <span>UTF-8</span>
+    <span>Spaces: 4</span>
+  </div>
+</div>
+
+<div class="libs-panel" id="libsPanel">
+  <div class="libs-header">
+    <div class="libs-title">📦 Bibliothèques</div>
+    <button class="libs-close" onclick="toggleLibs()">✕</button>
+  </div>
+  <div class="libs-search">
+    <input id="libSearch" type="text" placeholder="Chercher..." oninput="filterLibs()">
+  </div>
+  <div class="libs-list" id="libsList"></div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+<script>
+// ── DATA ──────────────────────────────────────────────
+const EXAMPLES = [
+`# 🎯 Exemple 1 — Bases Python
+nom = "PyStudio"
+version = 3.11
+
+print(f"Bienvenue dans {nom} v{version}!")
+
+# Boucles
+for i in range(1, 6):
+    print(f"  Compteur : {i}")
+
+# Fonction récursive
+def factorielle(n):
+    return 1 if n <= 1 else n * factorielle(n - 1)
+
+print(f"\\n5! = {factorielle(5)}")
+print(f"10! = {factorielle(10)}")`,
+
+`# 🔢 Exemple 2 — NumPy
+import numpy as np
+
+a = np.array([1, 2, 3, 4, 5])
+b = np.array([10, 20, 30, 40, 50])
+
+print("Tableau a:", a)
+print("Somme a+b:", a + b)
+print("Produit:", a * b)
+
+m = np.array([[1,2,3],[4,5,6],[7,8,9]])
+print("\\nMatrice 3x3:")
+print(m)
+print("Trace:", np.trace(m))
+
+data = np.random.normal(50, 10, 1000)
+print(f"\\nMoyenne: {data.mean():.2f}")
+print(f"Écart-type: {data.std():.2f}")`,
+
+`# 📊 Exemple 3 — Pandas
+import pandas as pd
+import numpy as np
+
+np.random.seed(42)
+df = pd.DataFrame({
+    'Nom': ['Alice', 'Bob', 'Claire', 'David', 'Emma'],
+    'Age': [28, 35, 24, 41, 30],
+    'Salaire': np.random.randint(35000, 80000, 5),
+    'Ville': ['Paris', 'Lyon', 'Bordeaux', 'Paris', 'Marseille']
+})
+
+print("=== DataFrame ===")
+print(df.to_string(index=False))
+print("\\n=== Stats ===")
+print(df[['Age','Salaire']].describe().to_string())
+print("\\n=== Moyenne par ville ===")
+print(df.groupby('Ville')['Salaire'].mean().to_string())`,
+
+`# 🧮 Exemple 4 — Algorithmes
+from functools import lru_cache
+
+# QuickSort
+def quicksort(arr):
+    if len(arr) <= 1: return arr
+    pivot = arr[len(arr)//2]
+    return quicksort([x for x in arr if x < pivot]) + \
+           [x for x in arr if x == pivot] + \
+           quicksort([x for x in arr if x > pivot])
+
+nums = [64, 34, 25, 12, 22, 11, 90]
+print("Avant:", nums)
+print("Après:", quicksort(nums))
+
+# Fibonacci mémoïsé
+@lru_cache(maxsize=None)
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+
+print("\\nFibonacci:", [fib(i) for i in range(16)])
+
+# Classe avec dataclass
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: float
+    y: float
+    def distance(self):
+        return (self.x**2 + self.y**2)**0.5
+
+p = Point(3, 4)
+print(f"\\nPoint {p} -> distance: {p.distance()}")`,
+];
+
+const LIBRARIES = [
+  { name:'numpy',       desc:'Calcul numérique & tableaux',         imp:'import numpy as np' },
+  { name:'pandas',      desc:'DataFrames et analyse de données',    imp:'import pandas as pd' },
+  { name:'matplotlib',  desc:'Visualisation graphique',             imp:'import matplotlib.pyplot as plt' },
+  { name:'scipy',       desc:'Calcul scientifique',                 imp:'from scipy import stats' },
+  { name:'math',        desc:'Fonctions mathématiques standard',    imp:'import math' },
+  { name:'random',      desc:'Génération aléatoire',                imp:'import random' },
+  { name:'datetime',    desc:'Dates et heures',                     imp:'from datetime import datetime, timedelta' },
+  { name:'json',        desc:'Sérialisation JSON',                  imp:'import json' },
+  { name:'re',          desc:'Expressions régulières',              imp:'import re' },
+  { name:'os',          desc:'Interface système',                   imp:'import os' },
+  { name:'sys',         desc:'Paramètres système',                  imp:'import sys' },
+  { name:'collections', desc:'Structures avancées',                 imp:'from collections import Counter, defaultdict, deque' },
+  { name:'itertools',   desc:'Itérateurs combinatoires',            imp:'import itertools' },
+  { name:'functools',   desc:'Fonctions d\'ordre supérieur',        imp:'from functools import reduce, lru_cache' },
+  { name:'typing',      desc:'Annotations de types',                imp:'from typing import List, Dict, Optional' },
+  { name:'dataclasses', desc:'@dataclass decorator',                imp:'from dataclasses import dataclass, field' },
+  { name:'abc',         desc:'Classes abstraites',                  imp:'from abc import ABC, abstractmethod' },
+  { name:'enum',        desc:'Énumérations',                        imp:'from enum import Enum, auto' },
+  { name:'copy',        desc:'Copie superficielle/profonde',        imp:'import copy' },
+  { name:'string',      desc:'Constantes de chaînes',               imp:'import string' },
+  { name:'hashlib',     desc:'Algorithmes de hachage',              imp:'import hashlib' },
+  { name:'base64',      desc:'Encodage Base64',                     imp:'import base64' },
+  { name:'io',          desc:'Streams en mémoire',                  imp:'import io' },
+  { name:'time',        desc:'Mesure du temps',                     imp:'import time' },
+  { name:'statistics',  desc:'Statistiques descriptives',           imp:'import statistics' },
+  { name:'decimal',     desc:'Arithmétique décimale précise',       imp:'from decimal import Decimal' },
+  { name:'fractions',   desc:'Arithmétique rationnelle',            imp:'from fractions import Fraction' },
+  { name:'pathlib',     desc:'Manipulation de chemins',             imp:'from pathlib import Path' },
+  { name:'pprint',      desc:'Affichage formaté',                   imp:'from pprint import pprint' },
+  { name:'textwrap',    desc:'Formatage de texte',                  imp:'import textwrap' },
+];
+
+// ── STATE ─────────────────────────────────────────────
+let pyodide = null;
+let pyReady = false;
+let exIdx = 0;
+let lineCount = 0;
+
+const editor   = document.getElementById('editor');
+const output   = document.getElementById('output');
+const lnums    = document.getElementById('lineNumbers');
+const runBtn   = document.getElementById('runBtn');
+const runIcon  = document.getElementById('runIcon');
+const runLabel = document.getElementById('runLabel');
+const sbStatus = document.getElementById('sbStatus');
+const sbCursor = document.getElementById('sbCursor');
+
+editor.value = EXAMPLES[0];
+updateLineNumbers();
+
+// ── PYODIDE INIT ──────────────────────────────────────
+async function initPyodide() {
+  addOut('system', '🔄 Chargement de Python (Pyodide)...');
+  try {
+    pyodide = await loadPyodide({ indexURL:'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/' });
+    addOut('system', '📦 Chargement numpy, pandas, scipy...');
+    await pyodide.loadPackage(['numpy','pandas','scipy','micropip']);
+
+    pyodide.runPython(`
+import sys
+
+class _Cap:
+    def __init__(self, k): self.k = k
+    def write(self, t):
+        if t and t.strip():
+            import js
+            js.window.pyOut(self.k, t)
+    def flush(self): pass
+
+sys.stdout = _Cap('stdout')
+sys.stderr = _Cap('stderr')
+`);
+    pyReady = true;
+    clearOutput();
+    addOut('success', '✅ Python 3.11 prêt ! Bibliothèques chargées : numpy, pandas, scipy + toutes les stdlib');
+    addOut('info',    '💡 Ctrl+Enter pour exécuter  •  📦 pour voir les bibliothèques  •  💡 pour les exemples');
+    sbStatus.textContent = '✓ Prêt';
+  } catch(e) {
+    addOut('stderr', '❌ Erreur : ' + e.message);
+    sbStatus.textContent = '❌ Erreur';
+  }
+}
+
+window.pyOut = (kind, text) => addOut(kind, text.trimEnd());
+
+initPyodide();
+
+// ── RUN ───────────────────────────────────────────────
+async function runCode() {
+  if (!pyReady) { notify('⏳ Python se charge encore...'); return; }
+  const code = editor.value.trim();
+  if (!code) { notify('✏️ Écris du code d\'abord !'); return; }
+
+  runBtn.classList.add('running');
+  runIcon.innerHTML = '<div class="spinner"></div>';
+  runLabel.textContent = 'Exécution...';
+  sbStatus.textContent = '▶ En cours...';
+
+  clearOutput();
+  addOut('info', '▶ Exécution...\n');
+
+  const t0 = performance.now();
+  try {
+    await pyodide.runPythonAsync(code);
+    const dt = ((performance.now()-t0)/1000).toFixed(3);
+    addOut('success', `\n✅ Terminé en ${dt}s`);
+    sbStatus.textContent = `✓ OK (${dt}s)`;
+  } catch(err) {
+    String(err.message||err).split('\n').filter(Boolean).forEach(l => addOut('stderr', l));
+    sbStatus.textContent = '❌ Erreur';
+  }
+
+  runBtn.classList.remove('running');
+  runIcon.textContent = '▶';
+  runLabel.textContent = 'Exécuter';
+}
+
+// ── OUTPUT ────────────────────────────────────────────
+function addOut(kind, text) {
+  lineCount++;
+  const row = document.createElement('div');
+  row.className = 'out-line';
+
+  const pre = document.createElement('div');
+  pre.className = 'out-prefix';
+  pre.textContent = ['system','info','success','warning'].includes(kind) ? '' : lineCount;
+
+  const span = document.createElement('div');
+  span.className = 'out-text ' + kind;
+  span.textContent = text;
+
+  row.append(pre, span);
+  output.appendChild(row);
+  output.scrollTop = output.scrollHeight;
+}
+
+function clearOutput() { output.innerHTML = ''; lineCount = 0; }
+
+function switchTab(el, tab) {
+  document.querySelectorAll('.otab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── EDITOR ────────────────────────────────────────────
+function updateLineNumbers() {
+  const lines = editor.value.split('\n');
+  const cur = editor.value.substr(0, editor.selectionStart).split('\n').length;
+  lnums.innerHTML = lines.map((_,i) =>
+    `<span class="${i+1===cur?'active':''}">${i+1}</span>`).join('');
+}
+
+editor.addEventListener('input', updateLineNumbers);
+editor.addEventListener('click', updateLineNumbers);
+editor.addEventListener('keyup', () => {
+  updateLineNumbers();
+  const b = editor.value.substr(0, editor.selectionStart);
+  sbCursor.textContent = `Ln ${b.split('\n').length}, Col ${b.split('\n').pop().length+1}`;
+});
+editor.addEventListener('scroll', () => { lnums.scrollTop = editor.scrollTop; });
+editor.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = editor.selectionStart;
+    editor.value = editor.value.substr(0,s)+'    '+editor.value.substr(editor.selectionEnd);
+    editor.selectionStart = editor.selectionEnd = s+4;
+    updateLineNumbers();
+  }
+  if ((e.ctrlKey||e.metaKey) && e.key==='Enter') { e.preventDefault(); runCode(); }
+});
+
+// ── RESIZER ───────────────────────────────────────────
+const resizer = document.getElementById('resizer');
+const outPane = document.getElementById('outputPane');
+let resizing = false;
+
+resizer.addEventListener('mousedown', () => {
+  resizing = true;
+  resizer.classList.add('dragging');
+  document.body.style.cssText += 'cursor:col-resize;user-select:none';
+});
+document.addEventListener('mousemove', e => {
+  if (!resizing) return;
+  const rect = document.querySelector('.editor-area').getBoundingClientRect();
+  const w = Math.max(240, Math.min(rect.width-320-4, rect.right-e.clientX-2));
+  outPane.style.width = w+'px';
+});
+document.addEventListener('mouseup', () => {
+  if (resizing) {
+    resizing = false;
+    resizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }
+});
+
+// ── LIBS PANEL ────────────────────────────────────────
+function renderLibs(list) {
+  document.getElementById('libsList').innerHTML = list.map(l => `
+    <div class="lib-item">
+      <div class="lib-info">
+        <div class="lib-name">${l.name}</div>
+        <div class="lib-desc">${l.desc}</div>
+      </div>
+      <button class="lib-btn" onclick='doInsert(${JSON.stringify(l.imp)})'>+ import</button>
+    </div>`).join('');
+}
+
+function filterLibs() {
+  const q = document.getElementById('libSearch').value.toLowerCase();
+  renderLibs(LIBRARIES.filter(l => l.name.includes(q)||l.desc.toLowerCase().includes(q)));
+}
+
+function doInsert(imp) {
+  if (editor.value.includes(imp)) { notify('✓ Déjà importé !'); return; }
+  editor.value = imp+'\n'+editor.value;
+  updateLineNumbers();
+  notify('✅ Import ajouté en haut du fichier !');
+}
+
+function toggleLibs() {
+  const p = document.getElementById('libsPanel');
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) {
+    renderLibs(LIBRARIES);
+    document.getElementById('libSearch').focus();
+  }
+}
+
+// ── EXAMPLES ─────────────────────────────────────────
+function loadExample() {
+  exIdx = (exIdx+1) % EXAMPLES.length;
+  editor.value = EXAMPLES[exIdx];
+  updateLineNumbers();
+  notify(`💡 Exemple ${exIdx+1}/${EXAMPLES.length} chargé`);
+}
+
+// ── HELP ─────────────────────────────────────────────
+function showHelp() {
+  clearOutput();
+  [
+    ['info',   '╔══════════════════════════════════════╗'],
+    ['info',   '║         🐍 Aide PyStudio              ║'],
+    ['info',   '╚══════════════════════════════════════╝'],
+    ['system', ''],
+    ['success','⌨️  Raccourcis :'],
+    ['stdout', '  Ctrl+Enter  → Exécuter le code'],
+    ['stdout', '  Tab         → Indenter (4 espaces)'],
+    ['system', ''],
+    ['success','📦 Bibliothèques préchargées :'],
+    ['stdout', '  numpy, pandas, scipy'],
+    ['stdout', '  + toute la bibliothèque standard Python'],
+    ['system', ''],
+    ['success','💡 Navigation :'],
+    ['stdout', '  📦 → Panneau bibliothèques (+ import auto)'],
+    ['stdout', '  💡 → Charger des exemples de code'],
+    ['stdout', '  ↔  → Glisser le séparateur pour redimensionner'],
+  ].forEach(([k,t]) => addOut(k,t));
+}
+
+// ── SHOW VARS ─────────────────────────────────────────
+async function showVars() {
+  if (!pyReady) return;
+  clearOutput();
+  try {
+    const res = pyodide.runPython(`
+import sys
+ns = {k:v for k,v in globals().items()
+      if not k.startswith('_') and not callable(v)
+      and k not in ('In','Out','exit','quit')}
+lines = []
+for k,v in ns.items():
+    try:
+        t=type(v).__name__; s=repr(v)[:80]
+        lines.append(f"{k}  ({t})  =  {s}")
+    except: pass
+'\\n'.join(lines) if lines else '(Aucune variable en session)'`);
+    addOut('info', '=== Variables de session ===\n');
+    res.split('\n').forEach(l => addOut('stdout', l));
+  } catch(e) { addOut('stderr', e.message); }
+}
+
+// ── NOTIFY ────────────────────────────────────────────
+let ntTimer;
+function notify(msg) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(ntTimer);
+  ntTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
